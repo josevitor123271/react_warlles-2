@@ -1,0 +1,379 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogClose, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { ArrowLeft, ZoomIn, X, Download, Share2, Heart } from 'lucide-react';
+import Loading from '@/components/system/Loading';
+
+// Tipos para a API Nekos (mantidos para referência)
+// interface NekosImage {
+//   id: string;
+//   signature: string;
+//   url: string;
+//   width: number;
+//   height: number;
+//   extension: string;
+//   categories: string[];
+//   tags: string[];
+//   characters: any[];
+//   artists: any[];
+//   rating: 'safe' | 'suggestive' | 'borderline' | 'explicit';
+//   created_at: string;
+//   updated_at: string;
+// }
+
+// Interface para nossa imagem formatada
+interface GalleryImage {
+  id: string;
+  url: string;
+  title: string;
+  category: string;
+  description: string;
+}
+
+// Interface para controle de loading individual
+interface ImageLoadState {
+  [key: string]: boolean;
+}
+
+// Hook personalizado para buscar imagens da NekosAPI
+const useNekosImages = () => {
+  const [images, setImages] = useState<GalleryImage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchImages = async (limit: number = 12) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Buscar imagens aleatórias da API através do proxy
+      const response = await fetch(`/api/v4/images/random?limit=${limit}&rating=safe`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Verificar se os dados estão no formato esperado
+      if (!Array.isArray(data)) {
+        throw new Error('Formato de dados inválido da API - esperava array');
+      }
+
+      // Transformar os dados da API para nosso formato
+      const formattedImages: GalleryImage[] = data.map((item: any, index: number) => ({
+        id: item.id,
+        url: item.url,
+        title: `Imagem ${index + 1}`,
+        category: item.categories && item.categories.length > 0 ?
+          item.categories[0].charAt(0).toUpperCase() + item.categories[0].slice(1) :
+          'Anime',
+        description: item.tags ? `Imagem com tags: ${item.tags.slice(0, 3).join(', ')}` : 'Sem tags'
+      }));
+
+      setImages(formattedImages);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao carregar imagens');
+      console.error('Erro ao buscar imagens:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Buscar imagens ao montar o componente
+  useEffect(() => {
+    fetchImages();
+  }, []);
+
+  return { images, loading, error, refetch: fetchImages };
+};
+
+
+const Exercicio9 = () => {
+  const navigate = useNavigate();
+  const [selectedCategory, setSelectedCategory] = useState("Todos");
+  const [selectedImage, setSelectedImage] = useState<GalleryImage | null>(null);
+  const [imageLoadStates, setImageLoadStates] = useState<ImageLoadState>({});
+
+  // Usar o hook personalizado para buscar imagens da API
+  const { images, loading, error, refetch } = useNekosImages();
+
+  // Extrair categorias únicas das imagens
+  const categories = ["Todos", ...new Set(images.map(img => img.category))];
+
+  const filteredImages = selectedCategory === "Todos"
+    ? images
+    : images.filter(img => img.category === selectedCategory);
+
+  // Função para lidar com o carregamento individual de imagens
+  const handleImageLoad = (imageId: string) => {
+    setImageLoadStates(prev => ({
+      ...prev,
+      [imageId]: false
+    }));
+  };
+
+  const handleImageError = (imageId: string) => {
+    setImageLoadStates(prev => ({
+      ...prev,
+      [imageId]: false
+    }));
+  };
+
+  // Inicializar estado de loading para novas imagens
+  useEffect(() => {
+    const newLoadStates: ImageLoadState = {};
+    images.forEach(img => {
+      if (!(img.id in imageLoadStates)) {
+        newLoadStates[img.id] = true;
+      }
+    });
+    if (Object.keys(newLoadStates).length > 0) {
+      setImageLoadStates(prev => ({ ...prev, ...newLoadStates }));
+    }
+  }, [images]);
+
+  // Mostrar estado de carregamento
+  if (loading) {
+    return (
+      <div className="flex flex-col min-h-screen bg-background">
+        <header className="sticky top-0 z-10 p-4 border-b border-border bg-background/80 backdrop-blur-sm flex items-center justify-between">
+          <div className="container mx-auto px-0 flex items-center gap-4">
+            <Button
+              variant="ghost"
+              onClick={() => navigate('/')}
+              className="flex items-center gap-2 -ml-4 text-muted-foreground hover:text-foreground hover:bg-transparent"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              <span className="text-lg">Voltar</span>
+            </Button>
+            <div className="h-6 w-px bg-border mx-2 hidden sm:block"></div>
+            <h1 className="text-xl font-bold hidden sm:block">Galeria de Imagens</h1>
+          </div>
+        </header>
+
+        <main className="container mx-auto px-4 py-8 flex-1 flex items-center justify-center">
+          <Loading message="Carregando imagens..." />
+        </main>
+      </div>
+    );
+  }
+
+  // Mostrar erro se ocorrer
+  if (error) {
+    return (
+      <div className="flex flex-col min-h-screen bg-background">
+        <header className="sticky top-0 z-10 p-4 border-b border-border bg-background/80 backdrop-blur-sm flex items-center justify-between">
+          <div className="container mx-auto px-0 flex items-center gap-4">
+            <Button
+              variant="ghost"
+              onClick={() => navigate('/')}
+              className="flex items-center gap-2 -ml-4 text-muted-foreground hover:text-foreground hover:bg-transparent"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              <span className="text-lg">Voltar</span>
+            </Button>
+            <div className="h-6 w-px bg-border mx-2 hidden sm:block"></div>
+            <h1 className="text-xl font-bold hidden sm:block">Galeria de Imagens</h1>
+          </div>
+        </header>
+
+        <main className="container mx-auto px-4 py-8 flex-1 flex items-center justify-center">
+          <div className="text-center max-w-md">
+            <div className="text-destructive mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold mb-2">Erro ao carregar imagens</h2>
+            <p className="text-muted-foreground mb-6">{error}</p>
+            <Button onClick={(_) => refetch()} className="flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Tentar novamente
+            </Button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col min-h-screen bg-background">
+      {/* Header com botão de voltar */}
+      <header className="sticky top-0 z-10 p-4 border-b border-border bg-background/80 backdrop-blur-sm flex items-center justify-between">
+        <div className="container mx-auto px-0 flex items-center gap-4">
+          <Button
+            variant="ghost"
+            onClick={() => navigate('/')}
+            className="flex items-center gap-2 -ml-4 text-muted-foreground hover:text-foreground hover:bg-transparent"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            <span className="text-lg">Voltar</span>
+          </Button>
+          <div className="h-6 w-px bg-border mx-2 hidden sm:block"></div>
+          <h1 className="text-xl font-bold hidden sm:block">Galeria de Imagens</h1>
+        </div>
+      </header>
+
+      <main className="container mx-auto px-4 py-8 flex-1">
+
+        {/* Filtros de Categoria */}
+        <div className="flex flex-wrap gap-2 mb-8 justify-center">
+          {categories.map((category) => (
+            <Button
+              key={category}
+              variant={selectedCategory === category ? "default" : "outline"}
+              onClick={() => setSelectedCategory(category)}
+              className="rounded-full px-6 transition-all duration-300"
+            >
+              {category}
+            </Button>
+          ))}
+        </div>
+
+        {/* Grid de Imagens */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {filteredImages.map((image) => (
+            <Card
+              key={image.id}
+              className="group overflow-hidden border-0 bg-transparent cursor-pointer relative"
+              onClick={() => setSelectedImage(image)}
+            >
+              <div className="relative aspect-3/4 overflow-hidden rounded-xl bg-muted">
+                {/* Loading overlay para cada imagem */}
+                {imageLoadStates[image.id] && (
+                  <div className="absolute inset-0 z-10">
+                    <Loading 
+                      message=""
+                      className="h-full"
+                      overlay={true}
+                    />
+                  </div>
+                )}
+                
+                <img
+                  src={image.url}
+                  alt={image.title}
+                  className="object-cover w-full h-full transition-transform duration-500 group-hover:scale-110"
+                  loading="lazy"
+                  onLoad={() => handleImageLoad(image.id)}
+                  onError={() => handleImageError(image.id)}
+                />
+
+                {/* Overlay on Hover */}
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-[2px]">
+                  <div className="bg-background/20 p-3 rounded-full backdrop-blur-md border border-white/20 text-white transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                    <ZoomIn className="w-6 h-6" />
+                  </div>
+                </div>
+
+                {/* Info Overlay at Bottom */}
+                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 translate-y-2 group-hover:translate-y-0">
+                  <p className="text-white font-semibold truncate">{image.title}</p>
+                  <p className="text-white/70 text-xs">{image.category}</p>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+
+        {/* Empty State */}
+        {filteredImages.length === 0 && (
+          <div className="text-center py-20 text-muted-foreground">
+            <p className="text-lg">Nenhuma imagem encontrada nesta categoria.</p>
+          </div>
+        )}
+
+      </main>
+
+      {/* Lightbox / Modal */}
+      <Dialog open={!!selectedImage} onOpenChange={(open) => !open && setSelectedImage(null)}>
+        <DialogContent showCloseButton={false} className="max-w-6xl w-[95vw] h-[90vh] md:h-auto p-0 overflow-hidden bg-background border-border sm:rounded-2xl">
+          <DialogTitle className="sr-only">{selectedImage?.title}</DialogTitle>
+          <DialogDescription className="sr-only">{selectedImage?.description}</DialogDescription>
+
+          <div className="relative flex flex-col md:flex-row h-full max-h-[90vh]">
+
+            {/* Imagem em destaque */}
+            <div className="flex-1 bg-black flex items-center justify-center relative overflow-hidden group">
+              <img
+                src={selectedImage?.url}
+                alt={selectedImage?.title}
+                className="max-h-[60vh] md:max-h-[85vh] w-full object-contain"
+              />
+            </div>
+
+            {/* Sidebar de Detalhes (Desktop) / Bottom Sheet (Mobile) */}
+            <div className="w-full md:w-96 min-w-xs bg-card p-6 md:p-8 flex flex-col justify-between border-l border-border h-full md:h-auto overflow-y-auto">
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <Badge variant="secondary" className="mb-2 text-sm px-3 py-1">{selectedImage?.category}</Badge>
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full">
+                      <Heart className="w-6 h-6" />
+                    </Button>
+                    <DialogClose>
+                      <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full md:hidden">
+                        <X className="w-6 h-6" />
+                      </Button>
+                    </DialogClose>
+                  </div>
+                </div>
+
+                <h2 className="text-3xl font-bold mb-3">{selectedImage?.title}</h2>
+                <p className="text-muted-foreground text-base leading-relaxed mb-8">
+                  {selectedImage?.description}
+                </p>
+
+                <div className="space-y-6">
+                  <div className="text-sm text-muted-foreground">
+                    <p className="font-semibold text-foreground mb-2 text-base">Detalhes</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>Resolução</div>
+                      <div className="text-right font-medium">4k Ultra HD</div>
+                      <div>Formato</div>
+                      <div className="text-right font-medium">JPG</div>
+                      <div>Licença</div>
+                      <div className="text-right font-medium">Gratuita</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-4 mt-8">
+                <Button className="w-full flex gap-2 h-12 text-base" size="lg">
+                  <Download className="w-5 h-5" /> Baixar Imagem
+                </Button>
+                <Button variant="outline" className="w-full flex gap-2 h-12 text-base" size="lg">
+                  <Share2 className="w-5 h-5" /> Compartilhar
+                </Button>
+              </div>
+            </div>
+
+            {/* Close Button Absolute for Desktop */}
+            <DialogClose>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-4 right-4 z-50 text-white/70 hover:text-white bg-black/20 hover:bg-black/40 rounded-full hidden md:flex h-12 w-12"
+              >
+                <X className="w-8 h-8" />
+                <span className="sr-only">Fechar</span>
+              </Button>
+            </DialogClose>
+
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+export default Exercicio9;
+
+// Fonte onde peguei a API: https://nekosapi.com/docs/api-introduction

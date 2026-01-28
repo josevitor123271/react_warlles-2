@@ -1,0 +1,2 @@
+user password: josevitor2003
+admin: admin@example.
