@@ -13,6 +13,7 @@ import Exercicio7 from './pages/Exercicio7'
 import Exercicio8 from './pages/Exercicio8'
 import Exercicio9 from './pages/Exercicio9'
 import Exercicio10 from './pages/Exercicio10'
+import WelcomePage from './pages/WelcomePage'
 
 // Importar o react router dom para rotear páginas da nossa apicação
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
@@ -36,6 +37,7 @@ const App = () => {
         <Route path="/exercicio8" element={<Exercicio8 />} />
         <Route path="/exercicio9" element={<Exercicio9 />} />
         <Route path="/exercicio10" element={<Exercicio10 />} />
+        <Route path="/welcome" element={<WelcomePage />} />
       </Routes>
     </BrowserRouter>
   );

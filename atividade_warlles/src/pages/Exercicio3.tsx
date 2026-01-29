@@ -1,7 +1,7 @@
 // Exercício 3 – Formulário de Login
 
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,7 @@ import {
   Eye,
   EyeOff,
   LogIn,
+  UserPlus,
   Github,
   Chrome,
   Loader2,
@@ -19,17 +20,21 @@ import {
 } from 'lucide-react';
 
 const Exercicio3 = () => {
+  const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [errors, setErrors] = useState<{ email?: string, password?: string }>({});
+  const [errors, setErrors] = useState<{ username?: string, email?: string, password?: string }>({});
+  const [loginError, setLoginError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validação simples
-    const newErrors: { email?: string, password?: string } = {};
+    const newErrors: { username?: string, email?: string, password?: string } = {};
+    if (!username) newErrors.username = 'Nome de usuário é obrigatório';
     if (!email) newErrors.email = 'E-mail é obrigatório';
     if (!password) newErrors.password = 'Senha é obrigatória';
 
@@ -39,13 +44,50 @@ const Exercicio3 = () => {
     }
 
     setErrors({});
+    setLoginError('');
     setIsLoading(true);
 
-    // Simulação de login
-    setTimeout(() => {
+    try {
+      // Conexão com o backend Django - Rota de Signup/Create Account
+      const response = await fetch('http://localhost:8000/api/auth/signup/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username,
+          email,
+          password
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Conta criada com sucesso
+        localStorage.setItem('access_token', data.tokens.access);
+        localStorage.setItem('refresh_token', data.tokens.refresh);
+        localStorage.setItem('user_data', JSON.stringify(data.user));
+
+        setIsLoading(false);
+        // Redirecionar para a página de boas-vindas
+        navigate('/welcome');
+      } else {
+        // Erro na criação da conta
+        setIsLoading(false);
+        if (data.email) {
+          setLoginError(data.email[0]);
+        } else if (data.username) {
+          setLoginError(data.username[0]);
+        } else {
+          setLoginError(data.detail || 'Erro ao criar conta');
+        }
+      }
+    } catch (error) {
       setIsLoading(false);
-      alert(`Login realizado com sucesso!\nE-mail: ${email}`);
-    }, 2000);
+      setLoginError('Erro de conexão com o servidor');
+      console.error('Erro:', error);
+    }
   };
 
   return (
@@ -77,15 +119,35 @@ const Exercicio3 = () => {
               <ShieldCheck className="w-6 h-6" />
             </div>
             <CardTitle className="text-2xl font-bold tracking-tight">
-              Acesse sua conta
+              Crie sua conta
             </CardTitle>
             <CardDescription className="text-base text-muted-foreground">
-              Entre com suas credenciais para continuar
+              Preencha os dados abaixo para começar
             </CardDescription>
           </CardHeader>
 
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+
+              {/* Username Input */}
+              <div className="space-y-2">
+                <Label htmlFor="username" className={errors.username ? "text-destructive" : ""}>
+                  Nome de Usuário
+                </Label>
+                <Input
+                  id="username"
+                  type="text"
+                  placeholder="seunomedeusuario"
+                  className={errors.username ? "border-destructive focus-visible:ring-destructive" : ""}
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                />
+                {errors.username && (
+                  <p className="text-xs text-destructive animate-in slide-in-from-left-1">
+                    {errors.username}
+                  </p>
+                )}
+              </div>
 
               {/* Email Input */}
               <div className="space-y-2">
@@ -156,6 +218,13 @@ const Exercicio3 = () => {
                 </Label>
               </div>
 
+              {/* Login Error Message */}
+              {loginError && (
+                <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                  <p className="text-sm text-destructive text-center">{loginError}</p>
+                </div>
+              )}
+
               {/* Submit Button */}
               <Button
                 type="submit"
@@ -165,12 +234,12 @@ const Exercicio3 = () => {
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Entrando...
+                    Criando conta...
                   </>
                 ) : (
                   <>
-                    <LogIn className="mr-2 h-4 w-4" />
-                    Entrar
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Criar Conta
                   </>
                 )}
               </Button>
@@ -201,10 +270,10 @@ const Exercicio3 = () => {
 
           <CardFooter className="flex flex-col items-center justify-center p-6 bg-muted/20 border-t border-border mt-2">
             <p className="text-sm text-muted-foreground text-center">
-              Não tem uma conta?{" "}
-              <a href="#" className="font-medium text-primary hover:underline transition-all">
-                Cadastre-se gratuitamente
-              </a>
+              Já tem uma conta?{" "}
+              <Link to="/exercicio2" className="font-medium text-primary hover:underline transition-all">
+                Faça login
+              </Link>
             </p>
           </CardFooter>
         </Card>
@@ -212,7 +281,7 @@ const Exercicio3 = () => {
 
       {/* Footer minimalista */}
       <footer className="py-6 text-center text-sm text-muted-foreground/60">
-        <p>&copy; 2026 React Login Exercise. Todos os direitos reservados.</p>
+        <p>&copy; 2026 React Registration Exercise. Todos os direitos reservados.</p>
       </footer>
 
     </div>
